@@ -1,0 +1,1 @@
+I started this project just to learn. nothing teaches quite as well as failure. so nearly a year and a half after the catalyst, here i am. an homage to all the one like this before me that helped me deal with my adhd before we even truly knew what it was.

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A Paradigm of Peculiar Particles</title>
+    <!-- Link to your style.css file -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Link to Three.js and Tone.js libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+    <div id="container">
+        <button class="toggle-controls" onclick="toggleControls()" title="Toggle Controls">⚙️</button>
+
+        <div id="controls" class="hidden">
+            <div class="control-group">
+                <div class="control-group-header">
+                    <h3>Interaction</h3>
+                    <span>▼</span>
+                </div>
+                <div class="control-group-body">
+                    <div class="control-item">
+                        <label>Click Burst Size</label>
+                        <input type="range" id="burstSize" min="10" max="200" value="99" step="9">
+                        <div class="value-display" id="burstSizeValue">99</div>
+                    </div>
+                    <div class="control-item">
+                        <label>Drag Trail Density</label>
+                        <input type="range" id="trailDensity" min="5" max="50" value="33" step="1">
+                        <div class="value-display" id="trailDensityValue">33</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-group-header">
+                    <h3>Emission</h3>
+                    <span>▼</span>
+                </div>
+                <div class="control-item">
+                    <label>Particle Count</label>
+                    <input type="range" id="particleCount" min="100" max="10000" value="3399" step="25">
+                    <div class="value-display" id="particleCountValue">3399</div>
+                </div>
+                <div class="control-group-body">
+                    <label>Emission Rate</label>
+                    <input type="range" id="emissionRate" min="1" max="100" value="69" step="1">
+                    <div class="value-display" id="emissionRateValue">69/s</div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-group-header">
+                    <h3>Physics</h3>
+                    <span>▼</span>
+                </div>
+                <div class="control-group-body">
+                    <div class="control-item">
+                        <label>Gravity</label>
+                        <input type="range" id="gravity" min="-2" max="2" value="-1.00" step="0.001">
+                        <div class="value-display" id="gravityValue">-1.00</div>
+                    </div>
+                    <div class="control-item">
+                        <label>Initial Speed</label>
+                        <input type="range" id="initialSpeed" min="0" max="5" value="3" step="0.1">
+                        <div class="value-display" id="initialSpeedValue">3</div>
+                    </div>
+                    <div class="control-item">
+                        <label>Spread Angle</label>
+                        <input type="range" id="spreadAngle" min="0" max="360" value="180" step="1">
+                        <div class="value-display" id="spreadAngleValue">133</div>
+                    </div>
+                    <div class="control-item">
+                        <label>Air Resistance</label>
+                        <input type="range" id="airResistance" min="0" max="0.1" value="0.1" step="0.001">
+                        <div class="value-display" id="airResistanceValue">0.1</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-group-header">
+                    <h3>Appearance</h3>
+                    <span>▼</span>
+                </div>
+                <div class="control-group-body">
+                    <div class="control-item">
+                        <label>Start Color</label>
+                        <input type="color" id="startColor" value="#00f3ff">
+                    </div>
+                    <div class="control-item">
+                        <label>End Color</label>
+                        <input type="color" id="endColor" value="#fff300">
+                    </div>
+                    <div class="control-item">
+                        <label>Size</label>
+                        <input type="range" id="particleSize" min="0.1" max="10" value="3.9" step="0.1">
+                        <div class="value-display" id="particleSizeValue">3.9</div>
+                    </div>
+                    <div class="control-item">
+                        <label>Size Variation</label>
+                        <input type="range" id="sizeVariation" min="0" max="5" value="3.5" step="0.1">
+                        <div class="value-display" id="sizeVariationValue">3.5</div>
+                    </div>
+                    <div class="control-item">
+                        <label>Opacity</label>
+                        <input type="range" id="opacity" min="0" max="1" value="0.3" step="0.1">
+                        <div class="value-display" id="opacityValue">0.3</div>
+                    </div>
+                </div>
+            </div>
+
+
+            <div class="control-group">
+                <div class="control-group-header">
+                    <h3>Behavior</h3>
+                    <span>▼</span>
+                </div>
+                <div class="control-group-body">
+                    <div class="control-item">
+                        <label>Lifespan</label>
+                        <input type="range" id="lifespan" min="1" max="20" value="9" step="0.5">
+                        <div class="value-display" id="lifespanValue">9s</div>
+                    </div>
+                    <div class="control-item">
+                        <label>Turbulence</label>
+                        <input type="range" id="turbulence" min="0" max="2" value="1.3" step="0.01">
+                        <div class="value-display" id="turbulenceValue">1.3</div>
+                    </div>
+                    <div class="control-item">
+                        <label>Shape</label>
+                        <select id="particleShape">
+                            <option value="cube">Cube</option>
+                            <option value="point">Point</option>
+                            <option value="sphere">Sphere</option>
+
+                        </select>
+                    </div>
+                    <div class="control-item">
+                        <label>Blend Mode</label>
+                        <select id="blendMode">
+                            <option value="normal">Normal</option>
+                            <option value="additive">Additive</option>
+                            <option value="multiply">Multiply</option>
+                            <option value="subtactive">Subtract</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <div class="control-group-header">
+                        <h3>Environment</h3>
+                        <span>▼</span>
+                    </div>
+                    <div class="control-group-body">
+                        <div class="control-item">
+                            <label>Wind X</label>
+                            <input type="range" id="windX" min="-3" max="3" value="-1.5" step="0.01">
+                            <div class="value-display" id="windXValue">-1.5</div>
+                        </div>
+                        <div class="control-item">
+                            <label>Wind Y</label>
+                            <input type="range" id="windY" min="-3" max="3" value="1.5" step="0.01">
+                            <div class="value-display" id="windYValue">1.5</div>
+                        </div>
+                        <div class="control-item">
+                            <label>Wind Z</label>
+                            <input type="range" id="windZ" min="-3" max="3" value="1" step="0.01">
+                            <div class="value-display" id="windZValue">1</div>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <button onclick="resetToDefaults()">Reset to Defaults</button>
+                        <button onclick="toggleAnimation()" id="animationButton">Pause</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="stats">
+                <div>Active Particles: <span id="activeParticles">0</span></div>
+                <div>FPS: <span id="fps">60</span></div>
+            </div>
+
+            <!-- Add the start button here -->
+            <button id="startButton">Start Experience</button>
+
+        </div>
+
+        <!-- Link to your main.js file -->
+        <script src="main.js"></script>
+    </body>
+    </html>
