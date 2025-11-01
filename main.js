@@ -2,7 +2,8 @@
 let scene, camera, renderer, particles, particleSystem, emitter;
 let animationId;
 let isAnimating = true;
-let controlsVisible = true;
+// controlsVisible should start false because the DOM initially has the 'hidden' class
+let controlsVisible = false;
 
 let pingPongDelay; // Declare pingPongDelay globally
 // Tone.js instruments and effects
@@ -10,6 +11,9 @@ let synth, bassSynth, guitarSynth; // Drum kit will be handled differently
 let distortion;
 let reverb; // Declare reverb globally
 let feedbackDelay; // Declare feedbackDelay globally
+// Current playing note (for sustain) and release timeout
+let currentPlayingNote = null;
+let releaseTimeout = null;
 
 let synthWaveNotes = [
     "C4", "E4", "G4", "B4", "C5", // C Major chord and scale notes
@@ -68,11 +72,11 @@ let particleParams = {
     initialSpeed:3,
     spreadAngle: 133,
     airResistance: 0.1,
-    startColor: new THREE.Color(0x000000),
-    endColor: new THREE.Color(0xfff300),
+    startColor: new THREE.Color(0xffffff),
+    endColor: new THREE.Color(0xff00cc),
     size: 0.5,
     sizeVariation: 3,
-    opacity: 0.3,
+    opacity: 0.7,
     lifespan: 9,
     turbulence: 1.3,
     shape: 'cube',
@@ -155,7 +159,8 @@ class ParticleSystem {
                     vAlpha = alpha;
                     vColor = color;
                     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-                    gl_PointSize = size * (300.0 / -mvPosition.z);
+                    // slightly smaller point size scale for better visual proportions
+                    gl_PointSize = size * (150.0 / -mvPosition.z);
                     gl_Position = projectionMatrix * mvPosition;
                 }
             `,
@@ -217,14 +222,7 @@ class ParticleSystem {
     }
 
     update(deltaTime) {
-        // Emit new particles
-        this.emissionTimer += deltaTime;
-        const emissionInterval = 1 / particleParams.emissionRate;
-
-        while (this.emissionTimer >= emissionInterval && this.particles.length < particleParams.count) {
-            this.emit(1);
-            this.emissionTimer -= emissionInterval;
-        }
+        // NOTE: automatic emission disabled - particles are emitted only via explicit calls
 
         // Update existing particles
         for (let i = this.particles.length - 1; i >= 0; i--) {
@@ -370,11 +368,14 @@ async function init() {
             oscillator: { type: "sine" },
             envelope: { attack: 0.005, decay: 0.1, sustain: 0.05, release: 0.5 }
         }).chain(distortion, feedbackDelay); // Chain synth through distortion and then delays
+        // Lower overall synth output to roughly 70% perceived loudness (~ -3.1 dB)
+        try { synth.volume.value = -3.1; } catch (e) { /* ignore if not supported */ }
 
         bassSynth = new Tone.Synth({
             oscillator: { type: "square" },
             envelope: { attack: 0.001, decay: 0.2, sustain: 0.01, release: 0.3 }
         }).chain(distortion, feedbackDelay); // Chain bass synth through distortion and then delays
+        try { bassSynth.volume.value = -3.1; } catch (e) { /* ignore if not supported */ }
 
         // If you have guitarSynth and want it affected:
         guitarSynth = new Tone.MonoSynth({
@@ -448,6 +449,42 @@ function setupControls() {
             }
         });
     });
+
+    // Toggle-controls button behaviour: dim on click, restore after 1s hover
+    const toggleBtn = document.querySelector('.toggle-controls');
+    if (toggleBtn) {
+        let hoverRestoreTimer = null;
+        toggleBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // toggle controls and ensure aria is updated by toggleControls()
+            try { toggleControls(); } catch (err) {}
+            // add dimmed state when interacted with
+            toggleBtn.classList.add('dimmed');
+        });
+
+        toggleBtn.addEventListener('mouseenter', () => {
+            if (toggleBtn.classList.contains('dimmed')) {
+                hoverRestoreTimer = setTimeout(() => {
+                    toggleBtn.classList.remove('dimmed');
+                }, 1000);
+            }
+        });
+
+        toggleBtn.addEventListener('mouseleave', () => {
+            if (hoverRestoreTimer) { clearTimeout(hoverRestoreTimer); hoverRestoreTimer = null; }
+        });
+
+        // Touch support: restore after finger lifts and 1s hover-equivalent
+        toggleBtn.addEventListener('touchstart', (e) => {
+            // On touch, open controls immediately and dim
+            try { toggleControls(); } catch (err) {}
+            toggleBtn.classList.add('dimmed');
+        }, { passive: true });
+        toggleBtn.addEventListener('touchend', () => {
+            setTimeout(() => toggleBtn.classList.remove('dimmed'), 1000);
+        });
+    }
 }
 function updateParameter(id, value, type) {
     const numValue = type === 'color' ? value : parseFloat(value);
@@ -561,6 +598,56 @@ function setupMouseInteraction() {
     // Variables for throttling note playback during drag
     let lastNotePlaybackTime = 0;
 
+    // Helper: compute position-based note (similar mapping to index00 reference)
+    function getPositionNoteFromClient(clientX, clientY) {
+        const normalizedX = Math.max(0, Math.min(1, clientX / window.innerWidth));
+        const normalizedY = Math.max(0, Math.min(1, clientY / window.innerHeight));
+
+        const minorScaleNotes = [
+            'A2','B2','C3','D3','E3','F3','G3',
+            'A3','B3','C4','D4','E4','F4','G4',
+            'A4','B4','C5','D5','E5','F5','G5',
+            'A5','B5','C6','D6','E6'
+        ];
+
+        const baseIndex = Math.floor(normalizedX * 16);
+        const yVariation = Math.floor(normalizedY * 4);
+        const finalIndex = Math.min(baseIndex + yVariation * 4, minorScaleNotes.length - 1);
+        return minorScaleNotes[finalIndex] || 'A3';
+    }
+
+    function getVelocityFromMovement(clientX, clientY, prevX, prevY) {
+        const deltaX = Math.abs(clientX - (prevX || clientX));
+        const deltaY = Math.abs(clientY - (prevY || clientY));
+        const speed = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+        return Math.min(1.0, 0.3 + (speed / 50) * 0.7);
+    }
+
+    function playNoteStartAt(clientX, clientY) {
+        if (!isAudioEnabled || !synth) return;
+        const note = getPositionNoteFromClient(clientX, clientY);
+        const velocity = getVelocityFromMovement(clientX, clientY, previousMouseX, previousMouseY);
+        if (currentPlayingNote !== note) {
+            if (currentPlayingNote && synth) {
+                try { synth.triggerRelease(); } catch (e) {}
+            }
+            try { synth.triggerAttack(note, undefined, velocity); } catch (e) {}
+            currentPlayingNote = note;
+        }
+        if (releaseTimeout) { clearTimeout(releaseTimeout); releaseTimeout = null; }
+    }
+
+    function stopPlayingSoon() {
+        if (releaseTimeout) clearTimeout(releaseTimeout);
+        releaseTimeout = setTimeout(() => {
+            if (currentPlayingNote && synth) {
+                try { synth.triggerRelease(); } catch (e) {}
+            }
+            currentPlayingNote = null;
+            releaseTimeout = null;
+        }, 250);
+    }
+
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
@@ -599,11 +686,10 @@ function setupMouseInteraction() {
                 const worldPos = getWorldPosition(event.clientX, event.clientY);
                 emitAtPosition(worldPos);
 
-                // Trigger note playback during drag at a set interval
-                if (Date.now() - lastNotePlaybackTime > 150) { // Adjust interval (ms) as needed
-                     // Check if synths are initialized before playing
-                    if (synth && bassSynth) {
-                        playNextSynthWaveNote();
+                // Position-based note playback (throttled)
+                if (Date.now() - lastNotePlaybackTime > 100) {
+                    if (synth) {
+                        playNoteStartAt(event.clientX, event.clientY);
                     }
                     lastNotePlaybackTime = Date.now();
                 }
@@ -618,6 +704,8 @@ function setupMouseInteraction() {
             previousMouseY = event.clientY;
             touchStartTime = Date.now(); // Use touchStartTime for mouse clicks too
             event.preventDefault(); // Prevent default to avoid dragging issues
+            // start sustaining a note at click start
+            playNoteStartAt(previousMouseX, previousMouseY);
         }
     });
 
@@ -642,7 +730,11 @@ function setupMouseInteraction() {
                    playChord(); // Play a chord on click/tap
                 }
             }
+
+            // schedule a short release of the sustained note
+            stopPlayingSoon();
         }
+
         // Reset drag specific variables on mouseup/touchend
         lastNotePlaybackTime = 0; // Reset note throttle
     });
@@ -673,11 +765,10 @@ function setupMouseInteraction() {
                 const worldPos = getWorldPosition(touch.clientX, touch.clientY);
                 emitAtPosition(worldPos);
 
-                // Trigger note playback during drag at a set interval
-                if (Date.now() - lastNotePlaybackTime > 150) { // Adjust interval (ms) as needed
-                    // Check if synths are initialized before playing
-                    if (synth && bassSynth) {
-                        playNextSynthWaveNote();
+                // Position-based note playback (throttled)
+                if (Date.now() - lastNotePlaybackTime > 100) {
+                    if (synth) {
+                        playNoteStartAt(touch.clientX, touch.clientY);
                     }
                     lastNotePlaybackTime = Date.now();
                 }
@@ -732,9 +823,19 @@ function setupMouseInteraction() {
                         playChord(); // Play a chord on click/tap
                     }
                 }
+                // schedule short release of sustained note
+                stopPlayingSoon();
             }
         }
     });
+
+    // Safety: ensure note releases if mouseup/touchend occurs outside expected handlers
+    document.addEventListener('mouseup', () => {
+        stopPlayingSoon();
+    });
+    document.addEventListener('touchend', () => {
+        stopPlayingSoon();
+    }, { passive: true });
 
     // Smooth camera movement (This function remains largely the same)
     function updateCamera() {
@@ -808,6 +909,11 @@ function toggleControls() {
     } else {
         controls.classList.add('hidden');
     }
+    // update aria-expanded on toggle button for accessibility
+    const toggleBtn = document.querySelector('.toggle-controls');
+    if (toggleBtn) {
+        try { toggleBtn.setAttribute('aria-expanded', controlsVisible ? 'true' : 'false'); } catch (e) {}
+    }
 }
 
 function toggleAnimation() {
@@ -833,11 +939,11 @@ function resetToDefaults() {
     document.getElementById('initialSpeed').value = 3;
     document.getElementById('spreadAngle').value = 133;
     document.getElementById('airResistance').value = 0.1;
-    document.getElementById('startColor').value = '#000000';
-    document.getElementById('endColor').value = '#fff300';
+    document.getElementById('startColor').value = '#ffffff';
+    document.getElementById('endColor').value = '#ff00cc';
     document.getElementById('particleSize').value = 3.9;
     document.getElementById('sizeVariation').value = 3.5;
-    document.getElementById('opacity').value = 0.3;
+    document.getElementById('opacity').value = 0.7;
     document.getElementById('lifespan').value = 9;
     document.getElementById('turbulence').value = 1.3;
     document.getElementById('particleShape').value = 'cube';

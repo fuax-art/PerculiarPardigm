@@ -12,7 +12,14 @@
 </head>
 <body>
     <div id="container">
-        <button class="toggle-controls" onclick="toggleControls()" title="Toggle Controls">First Things First</button>
+        <button class="toggle-controls" title="Toggle Controls" aria-expanded="false">
+            <!-- placeholder SVG: replace with your brand SVG later -->
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" stroke="rgba(27,0,34,0.9)" stroke-width="1.5" fill="white" />
+                <path d="M8 12h8M12 8v8" stroke="#1b0022" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span class="sr-only">Controls</span>
+        </button>
 
         <div id="controls" class="hidden">
             <div class="control-group">
@@ -88,11 +95,11 @@
                 <div class="control-group-body">
                     <div class="control-item">
                         <label>Start Color</label>
-                        <input type="color" id="startColor" value="#000000">
+                        <input type="color" id="startColor" value="#ffffff">
                     </div>
                     <div class="control-item">
                         <label>End Color</label>
-                        <input type="color" id="endColor" value="#fff300">
+                        <input type="color" id="endColor" value="#ff00cc">
                     </div>
                     <div class="control-item">
                         <label>Size</label>
@@ -106,8 +113,8 @@
                     </div>
                     <div class="control-item">
                         <label>Opacity</label>
-                        <input type="range" id="opacity" min="0" max="1" value="0.3" step="0.1">
-                        <div class="value-display" id="opacityValue">0.3</div>
+                        <input type="range" id="opacity" min="0" max="1" value="0.7" step="0.1">
+                        <div class="value-display" id="opacityValue">0.7</div>
                     </div>
                 </div>
             </div>
