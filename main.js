@@ -1,7 +1,6 @@
-// PARTICLE PLAYGROUND - ZEN GARDEN OPTIMIZED VERSION
-// Enhanced for meditative, persistent particle accumulation
+// PARTICLE PLAYGROUND - ZEN GARDEN FIXED VERSION
+// Actually persistent particles with real accumulation
 
-// Global variables
 let scene, camera, renderer, particles, particleSystem, emitter;
 let animationId;
 let isAnimating = true;
@@ -27,33 +26,33 @@ let synthWaveNotes = [
 let currentNoteIndex = 0;
 let isAudioEnabled = true;
 
-// Particle system parameters - ZEN OPTIMIZED
+// ZEN MODE - ACTUALLY PERSISTENT
 let particleParams = {
-    count: 20000, // DOUBLED for more accumulation
+    count: 30000, // TRIPLED - was 10k
     emissionRate: 69,
-    gravity: -1,
-    initialSpeed: 3,
+    gravity: -0.3, // REDUCED gravity so they float longer
+    initialSpeed: 2, // SLOWER initial speed
     spreadAngle: 133,
-    airResistance: 0.1,
+    airResistance: 0.02, // MUCH LESS air resistance (was 0.1)
     startColor: new THREE.Color(0xffffff),
-    endColor: new THREE.Color(0xff00cc),
+    endColor: new THREE.Color(0x00ffff),
     size: 0.5,
     sizeVariation: 3,
     opacity: 0.7,
-    lifespan: 45, // 5X LONGER - was 9
-    turbulence: 1.3,
+    lifespan: 120, // 2 MINUTES base life (was 9s)
+    turbulence: 0.5, // LESS chaotic movement
     shape: 'cube',
     blendMode: 'subtractive',
-    windX: -1.5,
-    windY: 1.5,
-    windZ: 1,
+    windX: -0.3, // GENTLER wind
+    windY: 0.2,
+    windZ: 0.1,
     burstSize: 99,
     trailDensity: 33,
-    zenMode: true, // NEW: Toggle for gentle fade behavior
-    ghostDuration: 8 // NEW: How long particles linger after "death"
+    zenMode: true,
+    ghostDuration: 30, // 30 second ghost phase
+    clearingMode: false // NEW: For gentle clear tracking
 };
 
-// Particle class - ZEN ENHANCED
 class Particle {
     constructor(position, velocity) {
         this.position = position.clone();
@@ -62,21 +61,31 @@ class Particle {
         this.maxLife = particleParams.lifespan;
         this.size = particleParams.size + (Math.random() - 0.5) * particleParams.sizeVariation;
         this.turbulenceOffset = Math.random() * 1000;
+        this.clearing = false; // Track if particle is in gentle clear mode
+        this.clearStartLife = null; // Life value when clearing started
     }
 
     update(deltaTime) {
-        // Apply gravity
+        // GENTLE CLEAR OVERRIDE
+        if (particleParams.clearingMode && !this.clearing) {
+            this.clearing = true;
+            this.clearStartLife = this.life;
+            // Force life to max 5 seconds for gentle fade
+            this.life = Math.min(this.life, 5);
+        }
+
+        // Apply gravity (REDUCED in zen mode)
         this.velocity.y += particleParams.gravity * deltaTime;
 
-        // Apply air resistance
+        // Apply air resistance (MUCH LESS in zen mode)
         this.velocity.multiplyScalar(1 - particleParams.airResistance * deltaTime);
 
-        // Apply wind
+        // Apply wind (GENTLER)
         this.velocity.x += particleParams.windX * deltaTime;
         this.velocity.y += particleParams.windY * deltaTime;
         this.velocity.z += particleParams.windZ * deltaTime;
 
-        // Apply turbulence
+        // Apply turbulence (REDUCED)
         const time = Date.now() * 0.001;
         const turbulence = particleParams.turbulence;
         this.velocity.x += Math.sin(time + this.turbulenceOffset) * turbulence * deltaTime;
@@ -88,9 +97,11 @@ class Particle {
         // Update life
         this.life -= deltaTime;
 
-        // ZEN MODE: Allow particles to persist in ghost state
+        // ZEN MODE: Particles persist WAY longer
         if (particleParams.zenMode) {
-            return this.life > -particleParams.ghostDuration;
+            // Allow ghost phase that's 25% of original lifespan
+            const ghostPhase = particleParams.ghostDuration;
+            return this.life > -ghostPhase;
         } else {
             return this.life > 0;
         }
@@ -100,7 +111,6 @@ class Particle {
         return this.life / this.maxLife;
     }
 
-    // NEW: Get alpha based on life state
     getAlpha() {
         const lifeRatio = this.getLifeRatio();
         
@@ -109,21 +119,24 @@ class Particle {
             return particleParams.opacity * Math.max(0, lifeRatio);
         }
         
-        // ZEN MODE: Gentle fade with ghost phase
-        if (lifeRatio > 0) {
-            // Normal life: full opacity fade
-            return particleParams.opacity * lifeRatio;
+        // ZEN MODE with proper ghost phase
+        if (lifeRatio > 0.2) {
+            // First 80% of life: full brightness
+            return particleParams.opacity;
+        } else if (lifeRatio > 0) {
+            // Last 20% of life: gentle fade
+            const fadeRatio = lifeRatio / 0.2;
+            return particleParams.opacity * fadeRatio;
         } else {
-            // Ghost phase: ultra-gentle fade
+            // GHOST PHASE: ultra-slow fade
             const ghostRatio = Math.max(0, 1 + (this.life / particleParams.ghostDuration));
-            // Gentler curve for more persistent visibility
-            const easedGhost = Math.pow(ghostRatio, 0.5); // Square root for slower fade
-            return particleParams.opacity * 0.25 * easedGhost;
+            // Much slower curve - cubic root for even gentler fade
+            const easedGhost = Math.pow(ghostRatio, 0.33);
+            return particleParams.opacity * 0.4 * easedGhost; // 40% opacity in ghost
         }
     }
 }
 
-// Particle system class - ZEN ENHANCED
 class ParticleSystem {
     constructor() {
         this.particles = [];
@@ -240,14 +253,19 @@ class ParticleSystem {
                 positions[i * 3 + 1] = particle.position.y;
                 positions[i * 3 + 2] = particle.position.z;
 
-                // Interpolate color
-                const color = particleParams.startColor.clone().lerp(particleParams.endColor, 1 - Math.max(0, lifeRatio));
+                // Color interpolation - only start changing color in last 30% of life
+                let colorLerp = 0;
+                if (lifeRatio < 0.3) {
+                    colorLerp = 1 - (lifeRatio / 0.3);
+                }
+                const color = particleParams.startColor.clone().lerp(particleParams.endColor, colorLerp);
                 colors[i * 3] = color.r;
                 colors[i * 3 + 1] = color.g;
                 colors[i * 3 + 2] = color.b;
 
-                // ZEN MODE: Use particle's getAlpha method
-                sizes[i] = particle.size * Math.max(0.1, Math.abs(lifeRatio));
+                // Size stays consistent until ghost phase
+                const sizeMultiplier = Math.max(0.3, Math.abs(lifeRatio) > 0 ? 1 : (1 + lifeRatio / particleParams.ghostDuration));
+                sizes[i] = particle.size * sizeMultiplier;
                 alphas[i] = particle.getAlpha();
             } else {
                 // Hide unused particles
@@ -275,17 +293,17 @@ class ParticleSystem {
         this.material.blending = blendModes[particleParams.blendMode];
     }
 
-    // NEW: Gentle clear function
     gentleClear() {
-        this.particles.forEach(p => {
-            if (p.life > 0) {
-                p.life = Math.min(p.life, 3); // Cap at 3 seconds remaining
-            }
-        });
+        // Set clearing mode flag
+        particleParams.clearingMode = true;
+        
+        // Reset after 6 seconds (time for all particles to fade)
+        setTimeout(() => {
+            particleParams.clearingMode = false;
+        }, 6000);
     }
 }
 
-// Initialize Three.js scene
 async function init() {
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -304,7 +322,6 @@ async function init() {
     animate();
     setupMouseInteraction();
 
-    // Start button for audio context
     document.getElementById('startButton').addEventListener('click', async () => {
         await Tone.start();
         console.log('AudioContext started');
@@ -320,7 +337,6 @@ async function init() {
             }
         });
 
-        // Create Effects
         reverb = new Tone.Reverb({
             decay: 5,
             preDelay: 0.1
@@ -370,7 +386,6 @@ function createGradientSphere() {
     const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
     gradient.addColorStop(0, '#000000'); 
     gradient.addColorStop(1, '#310342'); 
-    gradient.addColorStop(1, '#0e051c'); 
 
     context.fillStyle = gradient;
     context.fillRect(0, 0, canvas.width, canvas.height);
@@ -384,8 +399,7 @@ function createGradientSphere() {
         depthWrite: false
     });
 
-    const gradientSphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-    return gradientSphere;
+    return new THREE.Mesh(sphereGeometry, sphereMaterial);
 }
 
 function setupControls() {
@@ -544,16 +558,6 @@ function updateValueDisplay(id, value) {
     }
 }
 
-function playNextSynthWaveNote() {
-    const note = synthWaveNotes[currentNoteIndex];
-    const duration = "16n";
-    if (synth && bassSynth) {
-        synth.triggerAttackRelease(note, duration);
-        bassSynth.triggerAttackRelease(note, duration);
-    }
-    currentNoteIndex = (currentNoteIndex + 1) % synthWaveNotes.length;
-}
-
 function setupMouseInteraction() {
     let isDragging = false;
     let lastEmissionTime = 0;
@@ -579,22 +583,14 @@ function setupMouseInteraction() {
         return minorScaleNotes[finalIndex] || 'A3';
     }
 
-    function getVelocityFromMovement(clientX, clientY, prevX, prevY) {
-        const deltaX = Math.abs(clientX - (prevX || clientX));
-        const deltaY = Math.abs(clientY - (prevY || clientY));
-        const speed = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-        return Math.min(1.0, 0.3 + (speed / 50) * 0.7);
-    }
-
     function playNoteStartAt(clientX, clientY) {
         if (!isAudioEnabled || !synth) return;
         const note = getPositionNoteFromClient(clientX, clientY);
-        const velocity = getVelocityFromMovement(clientX, clientY, previousMouseX, previousMouseY);
         if (currentPlayingNote !== note) {
             if (currentPlayingNote && synth) {
                 try { synth.triggerRelease(); } catch (e) {}
             }
-            try { synth.triggerAttack(note, undefined, velocity); } catch (e) {}
+            try { synth.triggerAttack(note); } catch (e) {}
             currentPlayingNote = note;
         }
         if (releaseTimeout) { clearTimeout(releaseTimeout); releaseTimeout = null; }
@@ -607,7 +603,6 @@ function setupMouseInteraction() {
                 try { synth.triggerRelease(); } catch (e) {}
             }
             currentPlayingNote = null;
-            releaseTimeout = null;
         }, 250);
     }
 
@@ -684,7 +679,6 @@ function setupMouseInteraction() {
 
             stopPlayingSoon();
         }
-
         lastNotePlaybackTime = 0;
     });
 
@@ -761,13 +755,8 @@ function setupMouseInteraction() {
         }
     });
 
-    document.addEventListener('mouseup', () => {
-        stopPlayingSoon();
-    });
-    
-    document.addEventListener('touchend', () => {
-        stopPlayingSoon();
-    }, { passive: true });
+    document.addEventListener('mouseup', () => stopPlayingSoon());
+    document.addEventListener('touchend', () => stopPlayingSoon(), { passive: true });
 
     function updateCamera() {
         const radius = 15;
@@ -793,7 +782,6 @@ function setupMouseInteraction() {
     }
 }
 
-// Animation loop
 let lastTime = 0;
 let frameCount = 0;
 let fpsTimer = 0;
@@ -824,7 +812,6 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-// Utility functions
 function toggleControls() {
     const controls = document.getElementById('controls');
     controlsVisible = !controlsVisible;
@@ -856,7 +843,6 @@ function toggleAnimation() {
     }
 }
 
-// NEW: Gentle clear function
 function gentleClear() {
     if (particleSystem) {
         particleSystem.gentleClear();
@@ -864,24 +850,24 @@ function gentleClear() {
 }
 
 function resetToDefaults() {
-    document.getElementById('particleCount').value = 20000;
+    document.getElementById('particleCount').value = 30000;
     document.getElementById('emissionRate').value = 69;
-    document.getElementById('gravity').value = -1;
-    document.getElementById('initialSpeed').value = 3;
+    document.getElementById('gravity').value = -0.3;
+    document.getElementById('initialSpeed').value = 2;
     document.getElementById('spreadAngle').value = 133;
-    document.getElementById('airResistance').value = 0.1;
+    document.getElementById('airResistance').value = 0.02;
     document.getElementById('startColor').value = '#ffffff';
     document.getElementById('endColor').value = '#ff00cc';
     document.getElementById('particleSize').value = 3.9;
     document.getElementById('sizeVariation').value = 3.5;
     document.getElementById('opacity').value = 0.7;
-    document.getElementById('lifespan').value = 45;
-    document.getElementById('turbulence').value = 1.3;
+    document.getElementById('lifespan').value = 120;
+    document.getElementById('turbulence').value = 0.5;
     document.getElementById('particleShape').value = 'cube';
     document.getElementById('blendMode').value = 'subtactive';
-    document.getElementById('windX').value = -1.5;
-    document.getElementById('windY').value = 1.5;
-    document.getElementById('windZ').value = 1;
+    document.getElementById('windX').value = -0.3;
+    document.getElementById('windY').value = 0.2;
+    document.getElementById('windZ').value = 0.1;
     document.getElementById('burstSize').value = 99;
     document.getElementById('trailDensity').value = 33;
 
