@@ -3,47 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>A Paradigm of Peculiar Particles - Zen Garden Mode</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Zen Particle Garden</title>
+    <link rel="stylesheet" href="particle1.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 <body>
     <div id="container">
-        <button class="toggle-controls" title="Toggle Controls" aria-expanded="false">
-            <img src="fuaxface.svg" alt="Brand" class="brand-icon" aria-hidden="true" />
-            <span class="sr-only">Controls</span>
-        </button>
+        <button class="toggle-controls" onclick="toggleControls()" title="Toggle Controls">CLICK ME TO TOGGLE CONTROLS</button>
 
         <div id="controls" class="hidden">
-            <!-- NEW: ZEN MODE SECTION -->
-            <div class="control-group zen-highlight">
-                <div class="control-group-header">
-                    <h3>🧘 Zen Garden Mode</h3>
-                    <span>▼</span>
-                </div>
-                <div class="control-group-body">
-                    <div class="control-item">
-                        <label>Enable Zen Mode</label>
-                        <select id="zenMode">
-                            <option value="true" selected>On (Gentle Fade)</option>
-                            <option value="false">Off (Normal)</option>
-                        </select>
-                    </div>
-                    <div class="control-item">
-                        <label>Ghost Duration</label>
-                        <input type="range" id="ghostDuration" min="5" max="60" value="30" step="5">
-                        <div class="value-display" id="ghostDurationValue">30s</div>
-                    </div>
-                    <div class="control-item">
-                        <button onclick="gentleClear()" class="zen-button">🌊 Gentle Clear</button>
-                    </div>
-                    <div class="zen-info">
-                        <small>Zen mode makes particles linger and fade gracefully. Gentle Clear lets them peacefully dissolve.</small>
-                    </div>
-                </div>
-            </div>
-
             <div class="control-group">
                 <div class="control-group-header">
                     <h3>Interaction</h3>
@@ -70,8 +39,8 @@
                 </div>
                 <div class="control-group-body">
                     <div class="control-item">
-                        <label>Particle Count (Max)</label>
-                        <input type="range" id="particleCount" min="100" max="30000" value="30000" step="100">
+                        <label>Particle Count</label>
+                        <input type="range" id="particleCount" min="1000" max="30000" value="30000" step="1000">
                         <div class="value-display" id="particleCountValue">30000</div>
                     </div>
                     <div class="control-item">
@@ -101,7 +70,7 @@
                     <div class="control-item">
                         <label>Spread Angle</label>
                         <input type="range" id="spreadAngle" min="0" max="360" value="133" step="1">
-                        <div class="value-display" id="spreadAngleValue">133</div>
+                        <div class="value-display" id="spreadAngleValue">133°</div>
                     </div>
                     <div class="control-item">
                         <label>Air Resistance</label>
@@ -127,13 +96,13 @@
                     </div>
                     <div class="control-item">
                         <label>Size</label>
-                        <input type="range" id="particleSize" min="0.1" max="10" value="3.9" step="0.1">
-                        <div class="value-display" id="particleSizeValue">3.9</div>
+                        <input type="range" id="particleSize" min="0.1" max="10" value="0.5" step="0.1">
+                        <div class="value-display" id="particleSizeValue">0.5</div>
                     </div>
                     <div class="control-item">
                         <label>Size Variation</label>
-                        <input type="range" id="sizeVariation" min="0" max="5" value="3.5" step="0.1">
-                        <div class="value-display" id="sizeVariationValue">3.5</div>
+                        <input type="range" id="sizeVariation" min="0" max="5" value="3" step="0.1">
+                        <div class="value-display" id="sizeVariationValue">3</div>
                     </div>
                     <div class="control-item">
                         <label>Opacity</label>
@@ -150,9 +119,23 @@
                 </div>
                 <div class="control-group-body">
                     <div class="control-item">
+                        <label>Simulation Mode</label>
+                        <select id="interactionMode">
+                            <option value="zen">Zen (Persistent)</option>
+                            <option value="fluid">Fluid (Ink)</option>
+                            <option value="constrained">Web (Trapped)</option>
+                        </select>
+                    </div>
+
+                    <div class="control-item">
                         <label>Lifespan</label>
-                        <input type="range" id="lifespan" min="1" max="180" value="120" step="5">
+                        <input type="range" id="lifespan" min="1" max="300" value="120" step="5">
                         <div class="value-display" id="lifespanValue">120s</div>
+                    </div>
+                    <div class="control-item">
+                        <label>Ghost Duration</label>
+                        <input type="range" id="ghostDuration" min="0" max="60" value="30" step="1">
+                        <div class="value-display" id="ghostDurationValue">30s</div>
                     </div>
                     <div class="control-item">
                         <label>Turbulence</label>
@@ -172,7 +155,7 @@
                         <select id="blendMode">
                             <option value="normal">Normal</option>
                             <option value="additive">Additive</option>
-                            <option value="subtactive">Subtract</option>
+                            <option value="subtractive" selected>Subtract</option>
                         </select>
                     </div>
                 </div>
@@ -203,20 +186,21 @@
             </div>
 
             <div class="control-group">
-                <button onclick="resetToDefaults()">Reset to Zen Defaults</button>
+                <button onclick="resetToDefaults()">Reset to Defaults</button>
+                <button onclick="gentleClear()">Gentle Clear</button>
                 <button onclick="toggleAnimation()" id="animationButton">Pause</button>
             </div>
-
-            <div id="stats">
-                <div>Active Particles: <span id="activeParticles">0</span></div>
-                <div>FPS: <span id="fps">60</span></div>
-            </div>
-
-            <button id="disableAudioButton">Disable Audio</button>
-            <button id="startButton">Start Experience</button>
         </div>
 
-        <script src="main.js"></script>
+        <div id="stats">
+            <div>Active Particles: <span id="activeParticles">0</span></div>
+            <div>FPS: <span id="fps">60</span></div>
+        </div>
+
+        <button id="disableAudioButton">QUIET PLEASE</button>
+        <button id="startButton">PERMISSION TO USE YOUR SOUND</button>
     </div>
+
+    <script src="particle1.js"></script>
 </body>
 </html>

@@ -1,11 +1,14 @@
-// PARTICLE PLAYGROUND - ZEN GARDEN FIXED VERSION
-// Actually persistent particles with real accumulation
+// PARTICLE PLAYGROUND - ZEN GARDEN + MODES MERGED
+// Persistent particles with real accumulation + Fluid/Web Modes
 
 let scene, camera, renderer, particles, particleSystem, emitter;
 let animationId;
 let isAnimating = true;
 let controlsVisible = false;
 let pingPongDelay;
+
+// NEW: Global target for "Web/Constrained" mode
+let cursorTarget = new THREE.Vector3(0, 0, 0);
 
 // Tone.js instruments and effects
 let synth, bassSynth, guitarSynth;
@@ -26,31 +29,32 @@ let synthWaveNotes = [
 let currentNoteIndex = 0;
 let isAudioEnabled = true;
 
-// ZEN MODE - ACTUALLY PERSISTENT
+// ZEN MODE DEFAULTS
 let particleParams = {
-    count: 30000, // TRIPLED - was 10k
+    count: 30000,
     emissionRate: 69,
-    gravity: -0.3, // REDUCED gravity so they float longer
-    initialSpeed: 2, // SLOWER initial speed
+    gravity: -0.3,
+    initialSpeed: 2,
     spreadAngle: 133,
-    airResistance: 0.02, // MUCH LESS air resistance (was 0.1)
+    airResistance: 0.02,
     startColor: new THREE.Color(0xffffff),
     endColor: new THREE.Color(0x00ffff),
     size: 0.5,
     sizeVariation: 3,
     opacity: 0.7,
-    lifespan: 120, // 2 MINUTES base life (was 9s)
-    turbulence: 0.5, // LESS chaotic movement
+    lifespan: 120,
+    turbulence: 0.5,
     shape: 'cube',
     blendMode: 'subtractive',
-    windX: -0.3, // GENTLER wind
+    windX: -0.3,
     windY: 0.2,
     windZ: 0.1,
     burstSize: 99,
     trailDensity: 33,
-    zenMode: true,
-    ghostDuration: 30, // 30 second ghost phase
-    clearingMode: false // NEW: For gentle clear tracking
+    zenMode: true, // Internal flag for ghosting logic
+    ghostDuration: 30,
+    clearingMode: false,
+    interactionMode: 'zen' // 'zen', 'fluid', or 'constrained'
 };
 
 class Particle {
@@ -61,8 +65,8 @@ class Particle {
         this.maxLife = particleParams.lifespan;
         this.size = particleParams.size + (Math.random() - 0.5) * particleParams.sizeVariation;
         this.turbulenceOffset = Math.random() * 1000;
-        this.clearing = false; // Track if particle is in gentle clear mode
-        this.clearStartLife = null; // Life value when clearing started
+        this.clearing = false;
+        this.clearStartLife = null;
     }
 
     update(deltaTime) {
@@ -70,26 +74,54 @@ class Particle {
         if (particleParams.clearingMode && !this.clearing) {
             this.clearing = true;
             this.clearStartLife = this.life;
-            // Force life to max 5 seconds for gentle fade
             this.life = Math.min(this.life, 5);
         }
 
-        // Apply gravity (REDUCED in zen mode)
-        this.velocity.y += particleParams.gravity * deltaTime;
+        const mode = particleParams.interactionMode;
 
-        // Apply air resistance (MUCH LESS in zen mode)
-        this.velocity.multiplyScalar(1 - particleParams.airResistance * deltaTime);
+        // --- PHYSICS CALCULATION BASED ON MODE ---
+        
+        if (mode === 'fluid') {
+            // FLUID MODE: Buoyancy and high viscosity
+            this.velocity.y += 0.2 * deltaTime; // Slight float
+            this.velocity.multiplyScalar(0.90); // Heavy friction (ink feel)
+            
+            // Extra swirling
+            const time = Date.now() * 0.001;
+            this.velocity.x += Math.sin(time + this.turbulenceOffset) * 2.0 * deltaTime;
+            this.velocity.z += Math.cos(time + this.turbulenceOffset) * 2.0 * deltaTime;
 
-        // Apply wind (GENTLER)
-        this.velocity.x += particleParams.windX * deltaTime;
-        this.velocity.y += particleParams.windY * deltaTime;
-        this.velocity.z += particleParams.windZ * deltaTime;
+        } else if (mode === 'constrained') {
+            // WEB MODE: Trapped by cursor
+            let direction = new THREE.Vector3().subVectors(cursorTarget, this.position);
+            
+            // Spring force attraction
+            this.velocity.add(direction.multiplyScalar(1.5 * deltaTime));
+            
+            // Heavy damping so they swarm instead of orbit
+            this.velocity.multiplyScalar(0.92); 
+            
+            // Jitter for "angry bee" effect
+            this.velocity.x += (Math.random() - 0.5) * 0.5;
+            this.velocity.y += (Math.random() - 0.5) * 0.5;
+            this.velocity.z += (Math.random() - 0.5) * 0.5;
 
-        // Apply turbulence (REDUCED)
-        const time = Date.now() * 0.001;
-        const turbulence = particleParams.turbulence;
-        this.velocity.x += Math.sin(time + this.turbulenceOffset) * turbulence * deltaTime;
-        this.velocity.z += Math.cos(time + this.turbulenceOffset * 1.1) * turbulence * deltaTime;
+        } else {
+            // ZEN / STANDARD MODE (Your original physics)
+            this.velocity.y += particleParams.gravity * deltaTime;
+            this.velocity.multiplyScalar(1 - particleParams.airResistance * deltaTime);
+            
+            // Wind
+            this.velocity.x += particleParams.windX * deltaTime;
+            this.velocity.y += particleParams.windY * deltaTime;
+            this.velocity.z += particleParams.windZ * deltaTime;
+
+            // Standard Turbulence
+            const time = Date.now() * 0.001;
+            const turbulence = particleParams.turbulence;
+            this.velocity.x += Math.sin(time + this.turbulenceOffset) * turbulence * deltaTime;
+            this.velocity.z += Math.cos(time + this.turbulenceOffset * 1.1) * turbulence * deltaTime;
+        }
 
         // Update position
         this.position.add(this.velocity.clone().multiplyScalar(deltaTime));
@@ -97,12 +129,13 @@ class Particle {
         // Update life
         this.life -= deltaTime;
 
-        // ZEN MODE: Particles persist WAY longer
-        if (particleParams.zenMode) {
-            // Allow ghost phase that's 25% of original lifespan
+        // LIFE CHECK LOGIC
+        if (mode === 'zen') {
+            // Zen mode has ghost phase
             const ghostPhase = particleParams.ghostDuration;
             return this.life > -ghostPhase;
         } else {
+            // Fluid and Web die normally
             return this.life > 0;
         }
     }
@@ -114,25 +147,22 @@ class Particle {
     getAlpha() {
         const lifeRatio = this.getLifeRatio();
         
-        if (!particleParams.zenMode) {
-            // Normal mode: linear fade
+        // Only use Ghost Phase logic if we are in Zen Mode
+        if (particleParams.interactionMode !== 'zen') {
             return particleParams.opacity * Math.max(0, lifeRatio);
         }
         
-        // ZEN MODE with proper ghost phase
+        // ZEN MODE GHOST LOGIC
         if (lifeRatio > 0.2) {
-            // First 80% of life: full brightness
             return particleParams.opacity;
         } else if (lifeRatio > 0) {
-            // Last 20% of life: gentle fade
             const fadeRatio = lifeRatio / 0.2;
             return particleParams.opacity * fadeRatio;
         } else {
-            // GHOST PHASE: ultra-slow fade
+            // GHOST PHASE
             const ghostRatio = Math.max(0, 1 + (this.life / particleParams.ghostDuration));
-            // Much slower curve - cubic root for even gentler fade
             const easedGhost = Math.pow(ghostRatio, 0.33);
-            return particleParams.opacity * 0.6 * easedGhost; // 60% opacity in ghost
+            return particleParams.opacity * 0.6 * easedGhost;
         }
     }
 }
@@ -187,7 +217,6 @@ class ParticleSystem {
 
         this.points = new THREE.Points(this.geometry, this.material);
         scene.add(this.points);
-
         this.emissionTimer = 0;
     }
 
@@ -196,45 +225,35 @@ class ParticleSystem {
         canvas.width = 64;
         canvas.height = 64;
         const context = canvas.getContext('2d');
-
         const gradient = context.createRadialGradient(32, 32, 0, 32, 32, 32);
         gradient.addColorStop(0, 'rgba(255,255,255,1)');
         gradient.addColorStop(0.5, 'rgba(255,255,255,0.5)');
         gradient.addColorStop(1, 'rgba(255,255,255,0)');
-
         context.fillStyle = gradient;
         context.fillRect(0, 0, 64, 64);
-
-        const texture = new THREE.CanvasTexture(canvas);
-        return texture;
+        return new THREE.CanvasTexture(canvas);
     }
 
     emit(count, position = new THREE.Vector3(0, 0, 0)) {
         for (let i = 0; i < count; i++) {
             if (this.particles.length >= particleParams.count) break;
-
             const angle = (Math.random() - 0.5) * particleParams.spreadAngle * Math.PI / 180;
             const elevation = (Math.random() - 0.5) * particleParams.spreadAngle * Math.PI / 180;
-
             const velocity = new THREE.Vector3(
                 Math.sin(angle) * Math.cos(elevation),
                 Math.sin(elevation),
                 Math.cos(angle) * Math.cos(elevation)
             ).multiplyScalar(particleParams.initialSpeed * (0.5 + Math.random() * 0.5));
-
             this.particles.push(new Particle(position, velocity));
         }
     }
 
     update(deltaTime) {
-        // Update existing particles
         for (let i = this.particles.length - 1; i >= 0; i--) {
             if (!this.particles[i].update(deltaTime)) {
                 this.particles.splice(i, 1);
             }
         }
-
-        // Update geometry
         this.updateGeometry();
     }
 
@@ -253,7 +272,6 @@ class ParticleSystem {
                 positions[i * 3 + 1] = particle.position.y;
                 positions[i * 3 + 2] = particle.position.z;
 
-                // Color interpolation - only start changing color in last 30% of life
                 let colorLerp = 0;
                 if (lifeRatio < 0.3) {
                     colorLerp = 1 - (lifeRatio / 0.3);
@@ -263,12 +281,11 @@ class ParticleSystem {
                 colors[i * 3 + 1] = color.g;
                 colors[i * 3 + 2] = color.b;
 
-                // Size stays consistent until ghost phase
+                // Standard size logic, modified for ghosting
                 const sizeMultiplier = Math.max(0.3, Math.abs(lifeRatio) > 0 ? 1 : (1 + lifeRatio / particleParams.ghostDuration));
                 sizes[i] = particle.size * sizeMultiplier;
                 alphas[i] = particle.getAlpha();
             } else {
-                // Hide unused particles
                 positions[i * 3] = 0;
                 positions[i * 3 + 1] = 0;
                 positions[i * 3 + 2] = 0;
@@ -291,13 +308,11 @@ class ParticleSystem {
             'subtractive': THREE.SubtractiveBlending
         };
         this.material.blending = blendModes[particleParams.blendMode];
+        this.material.needsUpdate = true;
     }
 
     gentleClear() {
-        // Set clearing mode flag
         particleParams.clearingMode = true;
-        
-        // Reset after 6 seconds (time for all particles to fade)
         setTimeout(() => {
             particleParams.clearingMode = false;
         }, 6000);
@@ -337,22 +352,9 @@ async function init() {
             }
         });
 
-        reverb = new Tone.Reverb({
-            decay: 5,
-            preDelay: 0.1
-        }).toDestination();
-
-        feedbackDelay = new Tone.FeedbackDelay({
-            delayTime: "4n",
-            feedback: 0.6,
-            wet: 0.4
-        });
-
-        pingPongDelay = new Tone.PingPongDelay({
-            delayTime: "8n",
-            feedback: 0.5,
-            wet: 0.3
-        });
+        reverb = new Tone.Reverb({ decay: 5, preDelay: 0.1 }).toDestination();
+        feedbackDelay = new Tone.FeedbackDelay({ delayTime: "4n", feedback: 0.6, wet: 0.4 });
+        pingPongDelay = new Tone.PingPongDelay({ delayTime: "8n", feedback: 0.5, wet: 0.3 });
 
         feedbackDelay.connect(pingPongDelay);
         pingPongDelay.connect(reverb);
@@ -371,7 +373,6 @@ async function init() {
         try { bassSynth.volume.value = -3.1; } catch (e) {}
 
         guitarSynth = new Tone.MonoSynth({}).chain(distortion, feedbackDelay);
-
         document.getElementById('startButton').style.display = 'none';
     });
 }
@@ -382,34 +383,27 @@ function createGradientSphere() {
     canvas.width = 2;
     canvas.height = 128;
     const context = canvas.getContext('2d');
-
     const gradient = context.createLinearGradient(0, 0, 0, canvas.height);
     gradient.addColorStop(0, '#000000'); 
     gradient.addColorStop(1, '#310342'); 
-
     context.fillStyle = gradient;
     context.fillRect(0, 0, canvas.width, canvas.height);
-
     const gradientTexture = new THREE.CanvasTexture(canvas);
     gradientTexture.needsUpdate = true;
-
     const sphereMaterial = new THREE.MeshBasicMaterial({
         map: gradientTexture,
         side: THREE.BackSide,
         depthWrite: false
     });
-
     return new THREE.Mesh(sphereGeometry, sphereMaterial);
 }
 
 function setupControls() {
     const controls = document.querySelectorAll('input, select');
-
     controls.forEach(control => {
         control.addEventListener('input', (e) => {
             updateParameter(e.target.id, e.target.value, e.target.type);
         });
-
         if (control.type === 'range') {
             updateValueDisplay(control.id, control.value);
         }
@@ -436,7 +430,6 @@ function setupControls() {
             try { toggleControls(); } catch (err) {}
             toggleBtn.classList.add('dimmed');
         });
-
         toggleBtn.addEventListener('mouseenter', () => {
             if (toggleBtn.classList.contains('dimmed')) {
                 hoverRestoreTimer = setTimeout(() => {
@@ -444,16 +437,13 @@ function setupControls() {
                 }, 1000);
             }
         });
-
         toggleBtn.addEventListener('mouseleave', () => {
             if (hoverRestoreTimer) { clearTimeout(hoverRestoreTimer); hoverRestoreTimer = null; }
         });
-
         toggleBtn.addEventListener('touchstart', (e) => {
             try { toggleControls(); } catch (err) {}
             toggleBtn.classList.add('dimmed');
         }, { passive: true });
-        
         toggleBtn.addEventListener('touchend', () => {
             setTimeout(() => toggleBtn.classList.remove('dimmed'), 1000);
         });
@@ -462,7 +452,6 @@ function setupControls() {
 
 function updateParameter(id, value, type) {
     const numValue = type === 'color' ? value : parseFloat(value);
-
     switch(id) {
         case 'particleCount':
             particleParams.count = parseInt(value);
@@ -521,6 +510,14 @@ function updateParameter(id, value, type) {
             particleParams.blendMode = value;
             particleSystem.updateBlendMode();
             break;
+        case 'interactionMode': // NEW: Handle mode switching
+            particleParams.interactionMode = value;
+            if(value === 'fluid') {
+                particleParams.opacity = 0.15; // Auto-adjust for fluid look
+                updateValueDisplay('opacity', 0.15);
+                document.getElementById('opacity').value = 0.15;
+            }
+            break;
         case 'windX':
             particleParams.windX = numValue;
             updateValueDisplay(id, value);
@@ -540,9 +537,6 @@ function updateParameter(id, value, type) {
         case 'trailDensity':
             particleParams.trailDensity = parseInt(value);
             updateValueDisplay(id, value);
-            break;
-        case 'zenMode':
-            particleParams.zenMode = value === 'true';
             break;
         case 'ghostDuration':
             particleParams.ghostDuration = numValue;
@@ -569,14 +563,12 @@ function setupMouseInteraction() {
     function getPositionNoteFromClient(clientX, clientY) {
         const normalizedX = Math.max(0, Math.min(1, clientX / window.innerWidth));
         const normalizedY = Math.max(0, Math.min(1, clientY / window.innerHeight));
-
         const minorScaleNotes = [
             'A2','B2','C3','D3','E3','F3','G3',
             'A3','B3','C4','D4','E4','F4','G4',
             'A4','B4','C5','D5','E5','F5','G5',
             'A5','B5','C6','D6','E6'
         ];
-
         const baseIndex = Math.floor(normalizedX * 16);
         const yVariation = Math.floor(normalizedY * 4);
         const finalIndex = Math.min(baseIndex + yVariation * 4, minorScaleNotes.length - 1);
@@ -612,12 +604,10 @@ function setupMouseInteraction() {
     function getWorldPosition(clientX, clientY) {
         mouse.x = (clientX / window.innerWidth) * 2 - 1;
         mouse.y = -(clientY / window.innerHeight) * 2 + 1;
-
         raycaster.setFromCamera(mouse, camera);
         const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
         const intersectPoint = new THREE.Vector3();
         raycaster.ray.intersectPlane(plane, intersectPoint);
-
         return intersectPoint;
     }
 
@@ -633,15 +623,15 @@ function setupMouseInteraction() {
     }
 
     document.addEventListener('mousemove', (event) => {
+        // Track for Web/Constrained Mode
+        const worldPos = getWorldPosition(event.clientX, event.clientY);
+        if (worldPos) cursorTarget.copy(worldPos);
+
         if (!event.target.closest('#controls') && !event.target.closest('.toggle-controls') && !event.target.closest('#startButton')) {
             if (isDragging) {
-                const worldPos = getWorldPosition(event.clientX, event.clientY);
                 emitAtPosition(worldPos);
-
                 if (Date.now() - lastNotePlaybackTime > 100) {
-                    if (synth) {
-                        playNoteStartAt(event.clientX, event.clientY);
-                    }
+                    if (synth) playNoteStartAt(event.clientX, event.clientY);
                     lastNotePlaybackTime = Date.now();
                 }
             }
@@ -666,17 +656,11 @@ function setupMouseInteraction() {
             const deltaX = event.clientX - previousMouseX;
             const deltaY = event.clientY - previousMouseY;
             const moveDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-
             if (duration < 300 && moveDistance < 5) {
                 const worldPos = getWorldPosition(previousMouseX, previousMouseY);
-                if (particleSystem) {
-                    particleSystem.emit(particleParams.burstSize, worldPos);
-                }
-                if (synth) {
-                   playChord();
-                }
+                if (particleSystem) particleSystem.emit(particleParams.burstSize, worldPos);
+                if (synth) playChord();
             }
-
             stopPlayingSoon();
         }
         lastNotePlaybackTime = 0;
@@ -700,30 +684,29 @@ function setupMouseInteraction() {
 
     document.addEventListener('touchmove', (event) => {
         if (!event.target.closest('#controls') && !event.target.closest('.toggle-controls') && !event.target.closest('#startButton')) {
-            if (isDragging && event.touches.length === 1) {
+            if (event.touches.length === 1) { // SINGLE TOUCH = INTERACT
                 const touch = event.touches[0];
                 const worldPos = getWorldPosition(touch.clientX, touch.clientY);
-                emitAtPosition(worldPos);
+                if (worldPos) cursorTarget.copy(worldPos); // Update web target
 
-                if (Date.now() - lastNotePlaybackTime > 100) {
-                    if (synth) {
-                        playNoteStartAt(touch.clientX, touch.clientY);
+                if(isDragging) {
+                    emitAtPosition(worldPos);
+                    if (Date.now() - lastNotePlaybackTime > 100) {
+                        if (synth) playNoteStartAt(touch.clientX, touch.clientY);
+                        lastNotePlaybackTime = Date.now();
                     }
-                    lastNotePlaybackTime = Date.now();
                 }
-
                 previousMouseX = touch.clientX;
                 previousMouseY = touch.clientY;
                 event.preventDefault();
-            } else if (event.touches.length > 1) {
+
+            } else if (event.touches.length > 1) { // MULTI TOUCH = ROTATE
                 const touch1 = event.touches[0];
                 const deltaX = touch1.clientX - previousMouseX;
                 const deltaY = touch1.clientY - previousMouseY;
-
                 cameraRotationY += deltaX * 0.005;
                 cameraRotationX += deltaY * 0.005;
                 cameraRotationX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, cameraRotationX));
-
                 previousMouseX = touch1.clientX;
                 previousMouseY = touch1.clientY;
                 event.preventDefault();
@@ -740,15 +723,10 @@ function setupMouseInteraction() {
                 const deltaX = touch.clientX - previousMouseX;
                 const deltaY = touch.clientY - previousMouseY;
                 const moveDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-
                 if (duration < 300 && moveDistance < 5) {
                     const worldPos = getWorldPosition(previousMouseX, previousMouseY);
-                    if (particleSystem) {
-                        particleSystem.emit(particleParams.burstSize, worldPos);
-                    }
-                    if (synth) {
-                        playChord();
-                    }
+                    if (particleSystem) particleSystem.emit(particleParams.burstSize, worldPos);
+                    if (synth) playChord();
                 }
                 stopPlayingSoon();
             }
@@ -765,20 +743,16 @@ function setupMouseInteraction() {
         camera.position.z = radius * Math.cos(cameraRotationY) * Math.cos(cameraRotationX);
         camera.lookAt(0, 0, 0);
     }
-
     const originalAnimate = animate;
     animate = function() {
         updateCamera();
         originalAnimate();
     };
-
     function playChord() {
         const noteIndex = Math.floor(Math.random() * synthWaveNotes.length);
         const root = synthWaveNotes[noteIndex];
         const chord = Tone.Frequency(root).harmonize([0, 4, 7]);
-        if (synth) {
-            synth.triggerAttackRelease(chord, "0.5");
-        }
+        if (synth) synth.triggerAttackRelease(chord, "0.5");
     }
 }
 
@@ -788,34 +762,25 @@ let fpsTimer = 0;
 
 function animate() {
     if (!isAnimating) return;
-
     animationId = requestAnimationFrame(animate);
-
     const currentTime = performance.now();
     const deltaTime = (currentTime - lastTime) / 1000;
     lastTime = currentTime;
-
-    if (particleSystem) {
-        particleSystem.update(deltaTime);
-    }
-
+    if (particleSystem) particleSystem.update(deltaTime);
     frameCount++;
     fpsTimer += deltaTime;
-
     if (fpsTimer >= 1) {
         document.getElementById('fps').textContent = Math.round(frameCount / fpsTimer);
         document.getElementById('activeParticles').textContent = particleSystem ? particleSystem.particles.length : 0;
         frameCount = 0;
         fpsTimer = 0;
     }
-
     renderer.render(scene, camera);
 }
 
 function toggleControls() {
     const controls = document.getElementById('controls');
     controlsVisible = !controlsVisible;
-
     if (controlsVisible) {
         controls.classList.remove('hidden');
     } else {
@@ -830,23 +795,18 @@ function toggleControls() {
 function toggleAnimation() {
     isAnimating = !isAnimating;
     const button = document.getElementById('animationButton');
-
     if (isAnimating) {
         button.textContent = 'Pause';
         lastTime = performance.now();
         animate();
     } else {
         button.textContent = 'Play';
-        if (animationId) {
-            cancelAnimationFrame(animationId);
-        }
+        if (animationId) cancelAnimationFrame(animationId);
     }
 }
 
 function gentleClear() {
-    if (particleSystem) {
-        particleSystem.gentleClear();
-    }
+    if (particleSystem) particleSystem.gentleClear();
 }
 
 function resetToDefaults() {
@@ -858,18 +818,19 @@ function resetToDefaults() {
     document.getElementById('airResistance').value = 0.02;
     document.getElementById('startColor').value = '#ffffff';
     document.getElementById('endColor').value = '#ff00cc';
-    document.getElementById('particleSize').value = 3.9;
-    document.getElementById('sizeVariation').value = 3.5;
+    document.getElementById('particleSize').value = 0.5;
+    document.getElementById('sizeVariation').value = 3;
     document.getElementById('opacity').value = 0.7;
     document.getElementById('lifespan').value = 120;
     document.getElementById('turbulence').value = 0.5;
     document.getElementById('particleShape').value = 'cube';
-    document.getElementById('blendMode').value = 'subtactive';
+    document.getElementById('blendMode').value = 'subtractive';
     document.getElementById('windX').value = -0.3;
     document.getElementById('windY').value = 0.2;
     document.getElementById('windZ').value = 0.1;
     document.getElementById('burstSize').value = 99;
     document.getElementById('trailDensity').value = 33;
+    document.getElementById('interactionMode').value = 'zen'; // Reset mode
 
     document.querySelectorAll('input, select').forEach(control => {
         control.dispatchEvent(new Event('input'));
@@ -890,15 +851,9 @@ window.addEventListener('resize', () => {
 
 window.onload = function() {
     init();
-
     const notification = document.getElementById('control-notification');
     if (notification) {
-        setTimeout(() => {
-            notification.style.opacity = '0';
-        }, 5000);
-
-        notification.addEventListener('transitionend', () => {
-            notification.style.display = 'none';
-        });
+        setTimeout(() => { notification.style.opacity = '0'; }, 5000);
+        notification.addEventListener('transitionend', () => { notification.style.display = 'none'; });
     }
 };

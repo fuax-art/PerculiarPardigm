@@ -1,5 +1,4 @@
-/* PARTICLE PLAYGROUND - ZEN GARDEN MODE STYLES */
-
+/* Add styles here */
 * {
     margin: 0;
     padding: 0;
@@ -8,7 +7,7 @@
 
 body {
     font-family: 'VCR OSD Mono', monospace;
-    background: linear-gradient(165deg, #501b00, #560202);
+    background: linear-gradient(165deg, #802b00, #560202);
     color: rgb(0, 242, 255);
     overflow: hidden;
 }
@@ -26,7 +25,7 @@ body {
 #controls {
     position: absolute;
     top: 60px;
-    left: 20px;
+    right: 20px;
     background: linear-gradient(135deg, #5606884d, #2e2d2e50);
     padding: 15px;
     border-radius: 10px;
@@ -40,23 +39,16 @@ body {
 }
 
 #controls.hidden {
-    transform: translateX(-300px);
+    transform: translateX(300px);
     opacity: 0;
     pointer-events: none;
 }
 
 .control-group {
     margin-bottom: 10px;
-    border: 3px solid rgb(0, 204, 255);
+    border: 3px solid rgba(235, 5, 170, 0.338);
     border-radius: 8px;
     overflow: hidden;
-}
-
-/* ZEN MODE HIGHLIGHT */
-.control-group.zen-highlight {
-    border: 3px solid rgba(0, 255, 200, 0.5);
-    background: linear-gradient(135deg, rgba(0, 255, 200, 0.1), rgba(100, 200, 255, 0.05));
-    box-shadow: 0 0 15px rgba(0, 255, 200, 0.2);
 }
 
 .control-group-header {
@@ -66,17 +58,17 @@ body {
 }
 
 .control-group h3 {
-    color: #0deef5;
+    color: #0deef5 ; /* Example accent color */
     margin-bottom: 8px;
     font-size: 13px;
     text-transform: uppercase;
     letter-spacing: 1px;
-    display: inline-block;
-    margin-right: 10px;
+    display: inline-block; /* Allow space for icon */
+    margin-right: 10px; /* Space between text and icon */
 }
 
 .control-group-header span {
-    float: right;
+    float: right; /* Align icon to the right */
     transition: transform 0.9s ease;
 }
 
@@ -92,12 +84,12 @@ label {
     display: block;
     margin-bottom: 3px;
     font-size: 13px;
-    color: #ff5100;
+    color: #652000;
 }
 
 .control-group-body {
     padding: 10px;
-    transition: max-height 0.9s ease-in-out;
+    transition: max-height 0.9s ease-in-out; /* Smooth collapse animation */
     overflow: hidden;
 }
 
@@ -129,6 +121,64 @@ select option {
     color: rgb(0, 0, 0);
 }
 
+/* Enhanced styling for the sound progression select */
+#progressionSelect {
+    width: 100%;
+    padding: 8px;
+    background: linear-gradient(135deg, rgba(0, 255, 247, 0.1), rgba(255, 0, 221, 0.1));
+    border: 2px solid rgba(0, 234, 255, 0.4);
+    border-radius: 8px;
+    color: rgb(0, 255, 251);
+    cursor: crosshair;
+    font-family: 'VCR OSD Mono', monospace;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(5px);
+}
+
+#progressionSelect:hover {
+    border-color: rgba(0, 234, 255, 0.8);
+    box-shadow: 0 0 10px rgba(0, 234, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+#progressionSelect:focus {
+    outline: none;
+    border-color: #00eaff;
+    box-shadow: 0 0 15px rgba(0, 234, 255, 0.5);
+}
+
+#progressionSelect option {
+    background: linear-gradient(135deg, #560202, #802b00);
+    color: rgb(0, 242, 255);
+    padding: 5px;
+    border: none;
+}
+
+#progressionSelect option:hover,
+#progressionSelect option:selected {
+    background: linear-gradient(135deg, #ff00cc7b, #5606884d);
+    color: #00eaff;
+}
+
+/* Special styling for the sound selection control group */
+.control-group:has(#progressionSelect) {
+    border: 3px solid rgba(0, 234, 255, 0.4);
+    background: linear-gradient(135deg, rgba(0, 255, 247, 0.05), rgba(255, 0, 221, 0.05));
+}
+
+.control-group:has(#progressionSelect) .control-group-header {
+    background: rgba(0, 234, 237, 0.4);
+    border-bottom: 1px solid rgba(0, 234, 255, 0.3);
+}
+
+.control-group:has(#progressionSelect) .control-group-header h3 {
+    color: #00eaff;
+    text-shadow: 0 0 5px rgba(0, 234, 255, 0.5);
+}
+
 button {
     width: 100%;
     padding: 10px;
@@ -139,40 +189,10 @@ button {
     cursor: crosshair;
     font-weight: bold;
     transition: transform 0.9s;
-    margin-bottom: 5px;
 }
 
 button:hover {
     transform: translateY(-3px);
-}
-
-/* ZEN BUTTON SPECIAL STYLING */
-.zen-button {
-    background: linear-gradient(45deg, #00a896, #028090) !important;
-    color: #ffffff !important;
-    font-size: 14px;
-    padding: 12px !important;
-    box-shadow: 0 4px 15px rgba(0, 255, 200, 0.3);
-}
-
-.zen-button:hover {
-    transform: translateY(-3px) scale(1.02);
-    box-shadow: 0 6px 20px rgba(0, 255, 200, 0.5);
-}
-
-/* ZEN INFO TEXT */
-.zen-info {
-    background: rgba(0, 255, 200, 0.1);
-    border: 1px solid rgba(0, 255, 200, 0.3);
-    border-radius: 5px;
-    padding: 8px;
-    margin-top: 10px;
-}
-
-.zen-info small {
-    color: rgba(0, 255, 200, 0.9);
-    font-size: 11px;
-    line-height: 1.4;
 }
 
 .value-display {
@@ -192,81 +212,29 @@ button:hover {
 }
 
 .hidden {
-    display: none;
+    display: none
 }
 
 .toggle-controls {
     position: fixed;
-    top: 12px;
-    left: 12px;
-    min-width: 84px;
-    height: 84px;
-    padding: 0 14px;
-    border-radius: 12px;
-    background: linear-gradient(135deg, #ff5a9e, #ffb3ff);
-    color: #cc01ff;
-    border: 2px solid rgba(255,255,255,0.22);
-    z-index: 1200;
-    opacity: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: opacity 0.18s ease, transform 0.12s ease, box-shadow 0.18s ease;
-    font-size: 18px;
-    font-weight: 800;
-    letter-spacing: 0.6px;
-    text-shadow: 0 0 12px rgba(255,120,180,0.98);
-    box-shadow: 0 12px 36px rgba(255, 90, 160, 0.34), inset 0 1px 0 rgba(255,255,255,0.2);
-    user-select: none;
-    padding-left: 16px;
-    padding-right: 16px;
-    width: auto !important;
-    display: inline-flex !important;
-    touch-action: manipulation;
-}
-
-.toggle-controls .brand-icon {
-    width: 56px;
-    height: 56px;
-    display: block;
-    object-fit: contain;
-    border-radius: 8px;
-}
-
-.toggle-controls.dimmed {
-    opacity: 0.3;
-    transform: scale(0.98);
+    top: 20px;
+    right: 0;
+    background: rgba(0, 229, 255, 0.64);
+    border: 1px solid rgba(255, 0, 221, 0.2);
+    color: rgb(142, 64, 0);
+    padding: 3px 10px;
+    cursor: cell;
+    border-radius: 9px;
+    font-size: 13px;
+    transition: all 0.9s ease;
+    backdrop-filter: drop-shadow(8px 8px 10px rgb(255, 0, 153));
+    z-index: 1000;
 }
 
 .toggle-controls:hover {
-    transform: scale(1.08);
-    box-shadow: 0 10px 26px rgba(255, 90, 160, 0.45), inset 0 1px 0 rgba(255,255,255,0.2);
-    opacity: 1 !important;
-}
-
-.toggle-controls::after {
-    content: '';
-    position: absolute;
-    left: -6px;
-    top: -6px;
-    right: -6px;
-    bottom: -6px;
-    border-radius: 12px;
-    box-shadow: 0 0 24px rgba(255, 0, 140, 0.12);
-    pointer-events: none;
-}
-
-.sr-only {
-    position: absolute !important;
-    width: 1px !important;
-    height: 1px !important;
-    padding: 0 !important;
-    margin: -1px !important;
-    overflow: hidden !important;
-    clip: rect(0 0 0 0) !important;
-    white-space: nowrap !important;
-    border: 0 !important;
+  filter: invert 100% ;
+  background: rgba(0, 255, 247, 0.9);
+   transform: scale(1.05)
 }
 
 @media (max-width: 768px) {
@@ -278,11 +246,11 @@ button:hover {
         right: 20px;
         left: 20px;
     }
-    
+   
     #controls.hidden {
         transform: translateY(100%);
     }
-    
+   
     .toggle-controls {
         top: auto;
         bottom: calc(60vh + 40px);
@@ -301,18 +269,19 @@ button:hover {
     z-index: 1001;
     opacity: 1;
     transition: opacity 1s ease-in-out;
-    pointer-events: none;
+    pointer-events: none; /* Allow clicks to pass through */
 }
 
+/* Style for the start button */
 #startButton {
     position: absolute;
-    top: 50%;
+    top: 15%;
     left: 50%;
     transform: translate(-50%, -50%);
     padding: 15px 30px;
-    font-size: 20px;
+    font-size: 9px;
     z-index: 1002;
-    cursor: pointer;
+    cursor: crosshair;
     background: linear-gradient(45deg, #662c00, #270431);
     color: #00eaff;
     border: none;
